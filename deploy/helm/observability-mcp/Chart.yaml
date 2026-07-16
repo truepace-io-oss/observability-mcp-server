@@ -1,0 +1,23 @@
+apiVersion: v2
+name: observability-mcp
+description: |
+  MCP (Model Context Protocol) server that queries one or more observability
+  datasources (VictoriaMetrics, VictoriaLogs, Prometheus, Alertmanager) over
+  outbound HTTP. Per-datasource credentials (basic-auth, bearer tokens, custom
+  CAs) are configurable via the External Secrets Operator (ESO).
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - mcp
+  - observability
+  - victoriametrics
+  - victorialogs
+  - prometheus
+  - alertmanager
+  - ai
+home: https://github.com/truepace-io-oss/observability-mcp-server
+sources:
+  - https://github.com/truepace-io-oss/observability-mcp-server
+maintainers:
+  - name: truepace-io-oss

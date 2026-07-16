@@ -1,0 +1,68 @@
+# Example observability-mcp server configuration.
+# Env overrides: OMCP_LISTEN_ADDR, OMCP_METRICS_ADDR, OMCP_LOG_LEVEL,
+# OMCP_READ_ONLY, OMCP_DEFAULT_DATASOURCE, OMCP_AUTH_* .
+
+listenAddr: "0.0.0.0:9090"   # OMCP_LISTEN_ADDR
+metricsAddr: ":9091"         # OMCP_METRICS_ADDR; "off" to disable
+logLevel: "info"             # debug|info|warn|error ; OMCP_LOG_LEVEL
+readOnly: false              # global kill-switch (blocks alertmanager silence writes)
+defaultDatasource: "vm"      # OMCP_DEFAULT_DATASOURCE
+
+datasources:
+  # (a) VictoriaMetrics, cluster mode (vmselect), direct — no auth.
+  - name: vm
+    type: victoriametrics
+    url: "http://vmselect-victoria-metrics-k8s-stack.victoria-metrics-k8s-stack.svc:8481"
+    pathPrefix: "/select/0/prometheus"    # required for vmselect cluster mode
+    readOnly: false
+    timeout: "30s"
+
+  # (b) VictoriaLogs, cluster mode (vlselect), direct.
+  - name: logs
+    type: victorialogs
+    url: "http://vlselect-victoria-metrics-k8s-stack.victoria-metrics-k8s-stack.svc:9471"
+
+  # (c) Alertmanager (read-only in this example).
+  - name: alertmanager
+    type: alertmanager
+    url: "http://vmalertmanager-victoria-metrics-k8s-stack.victoria-metrics-k8s-stack.svc:9093"
+    readOnly: true
+
+  # (d) Same VM data via a vmauth proxy — the "with vmauth" variant. vmauth
+  #     routes to vmselect/vlselect internally and requires a VMUser credential.
+  - name: vm-via-vmauth
+    type: victoriametrics
+    url: "https://vmauth.tools.averion.zone"
+    auth:
+      basic:
+        username: "observability-mcp"
+        passwordFile: "/etc/omcp/datasources/vm-via-vmauth/password"   # ESO-mounted
+
+  # (e) A vanilla Prometheus (Prometheus-compatible /api/v1).
+  - name: prometheus
+    type: prometheus
+    url: "http://prometheus-operated.monitoring.svc:9090"
+
+# Agent -> MCP authentication (independent of datasource auth). Disabled here;
+# in production enable OIDC (Authentik) and/or static bearer tokens.
+auth:
+  enabled: false
+
+  static:
+    enabled: false
+    tokens:
+      - name: ci
+        tokenFile: /etc/omcp/auth/ci/token
+      - name: laptop
+        token: "change-me"
+
+  oidc:
+    enabled: false
+    issuer: ""              # Authentik: https://auth.example.com/application/o/observability-mcp/
+    audience: ""            # == Authentik client_id == token `aud`
+    jwksUrl: ""
+    requiredScopes: []
+    requiredGroups: []
+    groupsClaim: "groups"
+    usernameClaim: "preferred_username"
+    resourceMetadata: true

@@ -1,0 +1,122 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  # ---- Unit tests ----------------------------------------------------------
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go vet ./...
+      - run: go test ./internal/... -race -count=1
+
+  # ---- End-to-end against in-process fake backends -------------------------
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go test ./test/e2e/... -race -count=1
+
+  # ---- Helm chart lint + template validation -------------------------------
+  helm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: azure/setup-helm@v5
+      - name: Lint
+        run: helm lint deploy/helm/observability-mcp
+      - name: Template (defaults, a datasource, auth/OIDC, monitoring)
+        run: |
+          helm template t deploy/helm/observability-mcp > /dev/null
+          helm template t deploy/helm/observability-mcp \
+            --set 'datasources[0].name=vm' \
+            --set 'datasources[0].type=victoriametrics' \
+            --set 'datasources[0].url=http://vm:8481' \
+            --set 'config.defaultDatasource=vm' > /dev/null
+          helm template t deploy/helm/observability-mcp \
+            --set auth.enabled=true --set auth.oidc.enabled=true \
+            --set auth.oidc.issuer=https://auth.example.com/application/o/observability-mcp/ \
+            --set auth.oidc.audience=observability-mcp > /dev/null
+          helm template t deploy/helm/observability-mcp \
+            --set serviceMonitor.enabled=true --set grafanaDashboard.enabled=true > /dev/null
+
+  # ---- Multi-arch image build + push to GHCR -------------------------------
+  # Runs only on push to main / tags (not on PRs from forks). Pushes
+  # ghcr.io/<owner>/<repo> with branch/semver/sha tags (+ :latest on main).
+  build-and-push:
+    needs: [test, e2e, helm]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Image metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
+      - name: Build and push (linux/amd64, linux/arm64)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ steps.meta.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ---- Helm chart release (OCI) --------------------------------------------
+  # On a vX.Y.Z tag, package the chart and push it to GHCR as an OCI artifact:
+  #   oci://ghcr.io/<owner>/charts/observability-mcp:X.Y.Z
+  # The chart/app version is taken from the tag (v-prefix stripped).
+  publish-chart:
+    needs: [helm, build-and-push]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: azure/setup-helm@v5
+      - name: Log in to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
+      - name: Package and push chart
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          helm package deploy/helm/observability-mcp --version "$VERSION" --app-version "$VERSION"
+          helm push "observability-mcp-${VERSION}.tgz" "oci://ghcr.io/${{ github.repository_owner }}/charts"

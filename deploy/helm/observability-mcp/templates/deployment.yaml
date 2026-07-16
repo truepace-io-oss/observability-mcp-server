@@ -1,0 +1,103 @@
+{{- $root := . }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "observability-mcp.fullname" . }}
+  labels:
+    {{- include "observability-mcp.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "observability-mcp.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "observability-mcp.selectorLabels" . | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "observability-mcp.serviceAccountName" . }}
+      {{- if or .Values.imagePullSecret.esoRef .Values.imagePullSecret.existingSecret }}
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecret.existingSecret | default (printf "%s-pull" (include "observability-mcp.fullname" .)) }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: observability-mcp
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args: ["--config", "/etc/omcp/config.yaml"]
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+            {{- if .Values.metrics.enabled }}
+            - name: metrics
+              containerPort: {{ .Values.metrics.port }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 15
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/omcp/config.yaml
+              subPath: config.yaml
+              readOnly: true
+            {{- range .Values.datasources }}
+            {{- if or (and .tls .tls.caEsoRef) (and .auth .auth.basic .auth.basic.esoRef) (and .auth .auth.bearer .auth.bearer.esoRef) }}
+            - name: ds-{{ .name }}
+              mountPath: /etc/omcp/datasources/{{ .name }}
+              readOnly: true
+            {{- end }}
+            {{- end }}
+            {{- if .Values.auth.enabled }}
+            {{- range .Values.auth.static.tokens }}
+            - name: auth-{{ .name }}
+              mountPath: /etc/omcp/auth/{{ .name }}
+              readOnly: true
+            {{- end }}
+            {{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "observability-mcp.fullname" . }}
+        {{- range .Values.datasources }}
+        {{- if or (and .tls .tls.caEsoRef) (and .auth .auth.basic .auth.basic.esoRef) (and .auth .auth.bearer .auth.bearer.esoRef) }}
+        - name: ds-{{ .name }}
+          secret:
+            secretName: {{ .existingSecret | default (include "observability-mcp.datasourceSecretName" (dict "root" $root "datasource" .)) }}
+        {{- end }}
+        {{- end }}
+        {{- if .Values.auth.enabled }}
+        {{- range .Values.auth.static.tokens }}
+        - name: auth-{{ .name }}
+          secret:
+            secretName: {{ .existingSecret | default (printf "%s-auth-%s" (include "observability-mcp.fullname" $root) .name) }}
+        {{- end }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

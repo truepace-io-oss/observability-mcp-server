@@ -1,0 +1,14 @@
+{
+  "//": "Cursor (~/.cursor/mcp.json or project .cursor/mcp.json): omit 'type'; use ${env:NAME} for interpolation.",
+  "mcpServers": {
+    "observability": {
+      "url": "https://observability-mcp.tools.averion.zone/mcp"
+    },
+    "observability-private": {
+      "url": "https://observability-mcp.private.example.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${env:PRIVATE_INGRESS_TOKEN}"
+      }
+    }
+  }
+}

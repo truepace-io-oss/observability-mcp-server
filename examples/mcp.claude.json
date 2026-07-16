@@ -1,0 +1,27 @@
+{
+  "//": "Claude Code: connect to observability-mcp. 'type':'http' is required. See docs/auth.md for how OIDC client config depends on Dynamic Client Registration (DCR).",
+  "mcpServers": {
+    "observability": {
+      "//": "OIDC via Authentik (no DCR): give the pre-registered public client_id + the provider's OIDC discovery URL. Browser login on first use; run: claude mcp login observability.",
+      "type": "http",
+      "url": "https://observability-mcp.tools.averion.zone/mcp",
+      "oauth": {
+        "clientId": "observability-mcp",
+        "authServerMetadataUrl": "https://auth.tools.averion.zone/application/o/observability-mcp/.well-known/openid-configuration"
+      }
+    },
+    "observability-keycloak": {
+      "//": "OIDC via a DCR-capable provider (e.g. Keycloak): just the URL — the client self-registers.",
+      "type": "http",
+      "url": "https://observability-mcp.example.com/mcp"
+    },
+    "observability-private": {
+      "//": "Static bearer token.",
+      "type": "http",
+      "url": "https://observability-mcp.private.example.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${PRIVATE_MCP_TOKEN}"
+      }
+    }
+  }
+}
