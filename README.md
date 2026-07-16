@@ -18,7 +18,6 @@ self-metrics + Grafana dashboard, same Helm chart / CI / GitOps deployment conve
 | Prometheus | ✅ Supported | Prometheus-compatible `/api/v1/*`. |
 | VictoriaLogs (single & cluster `vlselect`) | ✅ Supported | LogsQL via `/select/logsql/*`; direct or via `vmauth`. |
 | Alertmanager (incl. `vmalertmanager`) | ✅ Supported | v2 API; read + silence create/delete (writes are read-only-gated). |
-| Grafana (dashboards / query proxy) | 🔜 Planned | — |
 | Loki | 🔜 Planned | LogQL — candidate `loki` datasource type. |
 | Thanos / Cortex / Mimir | 🔜 Planned | Prometheus-API-compatible; likely works as `prometheus` today. |
 | Jaeger / Tempo (traces) | 🔜 Considered | separate tool group. |
