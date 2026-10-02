@@ -85,8 +85,8 @@ add the `groups` scope mapping if you use `requiredGroups`; register the localho
 (`http://localhost:\d+/.*`, `http://127.0.0.1:\d+/.*`). In this repo the provider is created by the
 Authentik blueprint — see [environments-integration.md](environments-integration.md).
 
-Because Authentik has no DCR, the client must be told the `client_id` **and** the auth-server
-metadata URL:
+Because Authentik has no DCR, the client must be told the `client_id`. The auth-server
+metadata URL remains an optional explicit discovery override:
 ```json
 { "mcpServers": { "observability": {
   "type": "http",

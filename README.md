@@ -96,7 +96,8 @@ See [`examples/config.yaml`](examples/config.yaml) for a full example (all types
 ```bash
 claude mcp add --transport http observability https://observability-mcp.tools.averion.zone/mcp
 ```
-For OIDC via Authentik you must supply the `client_id` and auth-server metadata URL — see
+For OIDC via Authentik you must supply the `client_id`; the auth-server metadata URL is an
+optional explicit discovery override — see
 [`examples/mcp.claude.json`](examples/mcp.claude.json), [`examples/mcp.cursor.json`](examples/mcp.cursor.json),
 and [`docs/auth.md`](docs/auth.md).
 
