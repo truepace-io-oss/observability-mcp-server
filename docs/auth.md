@@ -52,6 +52,7 @@ auth:
     enabled: true
     issuer: "https://auth.tools.averion.zone/application/o/observability-mcp/"
     audience: "observability-mcp"      # == Authentik client_id == token aud
+    resource: "https://observability-mcp.tools.averion.zone/mcp"
     groupsClaim: "groups"
     usernameClaim: "preferred_username"
     requiredGroups: []                  # e.g. ["observability-mcp-users"]
@@ -68,7 +69,7 @@ sequenceDiagram
   C->>M: POST /mcp (no token)
   M-->>C: 401 + WWW-Authenticate (resource_metadata URL)
   C->>M: GET /.well-known/oauth-protected-resource
-  M-->>C: { authorization_servers:[issuer], resource:audience }
+  M-->>C: { authorization_servers:[issuer], resource:resource }
   C->>P: discover metadata, open browser, user logs in (PKCE)
   P-->>C: access token (JWT)
   C->>M: POST /mcp + Authorization: Bearer <JWT>
@@ -100,8 +101,9 @@ Then `claude mcp login observability` (log in as an `observability-mcp-users` me
 
 ### Provider setup — Keycloak (has DCR)
 
-Create a public PKCE client, add an **audience mapper** (`aud = <MCP audience>`) and a `groups`
-mapper. With DCR the client self-registers, so only the URL is needed in the agent config.
+Create a public PKCE client, add an **audience mapper** (`aud = oidc.audience`) and a `groups`
+mapper. Configure `oidc.resource` independently as the public MCP URL. With DCR the client
+self-registers, so only the URL is needed in the agent config.
 
 ## Both at once
 

@@ -129,7 +129,8 @@ auth:
   oidc:
     enabled: true
     issuer: https://authentik.example.com/application/o/observability-mcp/
-    audience: https://observability-mcp.intern.tools.averion.zone
+    audience: observability-mcp
+    resource: https://observability-mcp.example.com/mcp
     requiredGroups: ["observability-admins"]     # optional
 ```
 

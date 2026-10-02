@@ -32,13 +32,13 @@ docs/observability-mcp.md          # user-facing "how to connect" doc
 
 1. **Prototype** — model on `prototypes/kubernetes-mcp/`. `app-data.ytt.yaml` declares
    `application.observabilityMcp` (namespace, image repo + `#! renovate: datasource=docker` tag,
-   `serviceMonitor`, `grafanaDashboard`, `dashboardFolder`, `ingressHost`, `oidc.{issuer,audience,requiredGroups}`,
+   `serviceMonitor`, `grafanaDashboard`, `dashboardFolder`, `ingressHost`, `oidc.{issuer,audience,resource,requiredGroups}`,
    and a `datasources` list with Bitwarden UUIDs for any basic/bearer/CA material).
 2. **Chart pin** — `vendir/vendir-data.ytt.yaml` sets `observabilityMcpChart:{name: observability-mcp,
    url: oci://ghcr.io/truepace-io-oss/charts, version: <x.y.z>}` with keys in **alphabetical order**
    (renovate requirement). `vendir/base.yaml` pulls it (copy the blueprint, swap the data ref).
 3. **Helm values** — `helm/observability-mcp.yaml` maps env data → chart values: image, `config.defaultDatasource`,
-   `auth.oidc` (enabled, issuer/audience/requiredGroups/groupsClaim/usernameClaim/resourceMetadata),
+   `auth.oidc` (enabled, issuer/audience/resource/requiredGroups/groupsClaim/usernameClaim/resourceMetadata),
    `externalSecrets` (enabled when any datasource needs a secret), the `datasources` loop (Bitwarden
    UUIDs → `auth.basic.esoRef`/`auth.bearer.esoRef`/`tls.caEsoRef`), `ingress` (enabled, `className: nginx`,
    host, TLS), `podSecurityContext` (nonroot 65532), `serviceMonitor`, `grafanaDashboard`
@@ -53,7 +53,7 @@ docs/observability-mcp.md          # user-facing "how to connect" doc
    to `environment.applications` and `observabilityMcp: { enabled: true }` under `authentikBlueprints`.
 6. **Per-env overrides** — `envs/prod-averion-tools/_apps/observability-mcp/app-data.ytt.yaml`: ingress
    host `observability-mcp.tools.averion.zone`, `serviceMonitor:true`, `grafanaDashboard:true`,
-   `dashboardFolder:"MCP Servers"`, the Authentik issuer/audience, and the datasources (VM/Logs/AM
+   `dashboardFolder:"MCP Servers"`, the Authentik issuer/audience, the public MCP resource URL, and the datasources (VM/Logs/AM
    in-cluster Services — see [datasources.md](datasources.md); start all `readOnly: true`).
 7. **Render & commit** — `myks render ALL` (never a single app), commit the sources and the rendered
    `rendered/argocd/prod-averion-tools/app-observability-mcp.yaml` +

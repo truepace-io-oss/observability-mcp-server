@@ -125,3 +125,27 @@ datasources:
 		t.Fatalf("env overrides not applied: readOnly=%v log=%s", cfg.ReadOnly, cfg.LogLevel)
 	}
 }
+
+func TestOIDCResourceValidation(t *testing.T) {
+	metadataDisabled := false
+	cases := []struct {
+		name    string
+		oidc    AuthOIDC
+		wantErr bool
+	}{
+		{"separate resource", AuthOIDC{Enabled: true, Issuer: "https://auth.example.com/", Audience: "observability-mcp", Resource: "https://observability-mcp.example.com/mcp"}, false},
+		{"absolute audience fallback", AuthOIDC{Enabled: true, Issuer: "https://auth.example.com/", Audience: "https://observability-mcp.example.com/mcp"}, false},
+		{"client id without resource", AuthOIDC{Enabled: true, Issuer: "https://auth.example.com/", Audience: "observability-mcp"}, true},
+		{"resource with fragment", AuthOIDC{Enabled: true, Issuer: "https://auth.example.com/", Audience: "observability-mcp", Resource: "https://observability-mcp.example.com/mcp#fragment"}, true},
+		{"resource with empty fragment", AuthOIDC{Enabled: true, Issuer: "https://auth.example.com/", Audience: "observability-mcp", Resource: "https://observability-mcp.example.com/mcp#"}, true},
+		{"metadata disabled", AuthOIDC{Enabled: true, Issuer: "https://auth.example.com/", Audience: "observability-mcp", ResourceMetadata: &metadataDisabled}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := (Auth{Enabled: true, OIDC: tc.oidc}).validate()
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("validate() error = %v, wantErr %t", err, tc.wantErr)
+			}
+		})
+	}
+}
